@@ -1,0 +1,58 @@
+##
+# Copied from https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/automating-dependabot-with-github-actions#approve-a-pull-request
+#
+# Do not copy-paste this code without understanding the security warning at https://docs.github.com/en/actions/reference/events-that-trigger-workflows#pull_request_target
+#
+name: Automatically Merge Dependabot Updates
+on:
+  pull_request_target:
+    types:
+      - edited
+      - labeled
+      - opened
+      - reopened
+      - synchronize
+      - unlabeled
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  dependabot_approve_boto3:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+    - name: Dependabot metadata
+      id: metadata
+      uses: dependabot/fetch-metadata@v1.1.1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Info
+      run: |
+        echo 'steps.metadata.outputs.dependency-names:'
+        echo '"${{ steps.metadata.outputs.dependency-names }}"'
+        echo
+        echo 'steps.metadata.outputs.dependency-type:'
+        echo '"${{ steps.metadata.outputs.dependency-type }}"'
+        echo
+        echo 'steps.metadata.outputs.update-type:'
+        echo '"${{ steps.metadata.outputs.update-type }}"'
+        echo
+        echo 'steps.metadata.outputs.updated-dependencies-json:'
+        echo '"${{ steps.metadata.outputs.updated-dependencies-json }}"'
+        echo
+        echo 'toJSON(github.event.pull_request.labels):'
+        echo '"${{ toJSON(github.event.pull_request.labels) }}"'
+    - name: Approve
+      if: ${{ contains(steps.metadata.outputs.dependency-names, 'boto3') && steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
+      run: gh pr review --approve "$PR_URL"
+      env:
+        PR_URL: ${{github.event.pull_request.html_url}}
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+    - name: Automerge
+      if: ${{ contains(steps.metadata.outputs.dependency-names, 'boto3') && steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
+      run: gh pr merge --auto --squash "$PR_URL"
+      env:
+        PR_URL: ${{github.event.pull_request.html_url}}
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
